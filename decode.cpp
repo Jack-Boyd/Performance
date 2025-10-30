@@ -1,3 +1,4 @@
+#include <bitset>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -69,10 +70,32 @@ int main(int argc, char *argv[]) {
 
   instructions.close();
 
-  for (size_t i = 0; i + 1 < buffer.size(); i += 2) {
-    auto instr = decode(buffer[i], buffer[i + 1]);
-    std::cout << instr.mnemonic << " " << instr.operand1 << ", "
-              << instr.operand2 << "\n";
+  // auto instr = decode(buffer[i], buffer[i + 1]);
+  // std::cout << instr.mnemonic << " " << instr.operand1 << ", "
+  //           << instr.operand2 << "\n";
+
+  int byte = 0;
+  while (byte < 20) {
+    if (extractBits(buffer[byte], 2, 6) == 0b100010) {
+      std::cout << "Register/Memory to/from register" << std::endl;
+      std::cout << std::bitset<8>(buffer[byte]) << " ";
+      std::cout << std::bitset<8>(buffer[byte + 1]) << std::endl;
+      byte += 2;
+    } else if (extractBits(buffer[byte], 4, 4) == 0b1011) {
+      auto w = extractBits(buffer[byte], 3, 1);
+      if (w == 0) {
+        std::cout << "Immediate to register 8 bit" << std::endl;
+        std::cout << std::bitset<8>(buffer[byte]) << " ";
+        std::cout << std::bitset<8>(buffer[byte + 1]) << std::endl;
+        byte += 2;
+      } else {
+        std::cout << "Immediate to register 16 bit" << std::endl;
+        std::cout << std::bitset<8>(buffer[byte]) << " ";
+        std::cout << std::bitset<8>(buffer[byte + 1]) << " ";
+        std::cout << std::bitset<8>(buffer[byte + 2]) << std::endl;
+        byte += 3;
+      }
+    }
   }
   return 0;
 }
