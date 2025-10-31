@@ -28,7 +28,9 @@ std::string displacementToString(Displacement dispType, uint8_t disp8,
     if (disp8Int > 0)
       oss << " + " << disp8Int;
   } else if (dispType == BYTE16BIT) {
-    oss << " + " << ((static_cast<uint16_t>(disp16) << 8) | disp8);
+    uint16_t disp16Int = (static_cast<uint16_t>(disp16) << 8) | disp8;
+    if (disp16Int > 0)
+      oss << " + " << disp16Int;
   }
   return oss.str();
 }
@@ -57,6 +59,19 @@ struct RMTFRInstruction {
     mod = extractBits(byte2, 6, 2);
     reg = extractBits(byte2, 3, 3);
     rm = extractBits(byte2, 0, 3);
+  }
+
+  int displacement8(uint8_t byte) {
+    disp = BYTE8BIT;
+    disp8 = byte;
+    return 1;
+  }
+
+  int displacement16(uint8_t byteLo, uint8_t byteHi) {
+    disp = BYTE16BIT;
+    disp8 = byteLo;
+    disp16 = byteHi;
+    return 2;
   }
 
   void print() const {
@@ -118,7 +133,6 @@ int main(int argc, char *argv[]) {
   while (i < buf.size()) {
     uint8_t opcode = buf[i];
 
-    // MOV reg/mem <-> reg
     if (extractBits(opcode, 2, 6) == 0b100010) {
       auto inst = RMTFRInstruction(opcode, buf[i + 1]);
       size_t size = 2;
@@ -126,29 +140,20 @@ int main(int argc, char *argv[]) {
       switch (inst.mod) {
       case 0b00:
         if (inst.rm == 0b110) {
-          inst.disp = BYTE16BIT;
-          inst.disp8 = buf[i + 2];
-          inst.disp16 = buf[i + 3];
-          size += 2;
+          size += inst.displacement16(buf[i + 2], buf[i + 3]);
         }
         break;
       case 0b01:
-        inst.disp = BYTE8BIT;
-        inst.disp8 = buf[i + 2];
-        size += 1;
+        size += inst.displacement8(buf[i + 2]);
         break;
       case 0b10:
-        inst.disp = BYTE16BIT;
-        inst.disp8 = buf[i + 2];
-        inst.disp16 = buf[i + 3];
-        size += 2;
+        size += inst.displacement16(buf[i + 2], buf[i + 3]);
         break;
       }
       inst.print();
       i += size;
     }
 
-    // MOV immediate to register
     else if (extractBits(opcode, 4, 4) == 0b1011) {
       auto inst = ITRInstruction(opcode);
       size_t immSize = inst.w ? 2 : 1;
@@ -161,7 +166,6 @@ int main(int argc, char *argv[]) {
       i += 1 + immSize;
     }
 
-    // Unrecognized instruction
     else {
       std::cerr << "Unknown opcode at byte " << i << ": " << std::hex
                 << static_cast<int>(opcode) << "\n";
